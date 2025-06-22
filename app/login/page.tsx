@@ -2,8 +2,9 @@
 
 import LoginForm from "@/src/components/ui/LoginForm";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function LoginPage() {
+function LoginContent() {
   const searchParams = useSearchParams();
   const registered = searchParams.get('registered');
 
@@ -25,5 +26,23 @@ export default function LoginPage() {
       </div>
       <LoginForm />
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12" style={{ background: 'var(--background)' }}>
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold mb-2 text-white">Welcome back</h1>
+          <p className="text-gray-300">
+            Log in to continue to your account
+          </p>
+        </div>
+        <LoginForm />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: icdapp
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXTAUTH_URL
+        fromDatabase:
+          name: icdapp-vars
+          property: NEXTAUTH_URL
+      - key: NEXTAUTH_SECRET
+        fromDatabase:
+          name: icdapp-vars
+          property: NEXTAUTH_SECRET
+      - key: NEXT_PUBLIC_API_URL
+        fromDatabase:
+          name: icdapp-vars
+          property: NEXT_PUBLIC_API_URL
+      - key: NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+        fromDatabase:
+          name: icdapp-vars
+          property: NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+      - key: PAYSTACK_SECRET_KEY
+        fromDatabase:
+          name: icdapp-vars
+          property: PAYSTACK_SECRET_KEY
+      - key: NEXT_PUBLIC_IC_HOST
+        fromDatabase:
+          name: icdapp-vars
+          property: NEXT_PUBLIC_IC_HOST

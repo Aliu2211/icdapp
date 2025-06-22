@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]/route';
-
-// Mock subscriptions data (in a real app, this would be a database)
-import { subscriptions } from '../../user/subscription/route';
+import { authOptions } from '../../auth/[...nextauth]/auth-options';
+import { getAllSubscriptions, saveAllSubscriptions } from '@/src/lib/db/filedb';
+import { Subscription } from '@/src/types/global';
 
 // This is a server-side endpoint to verify Paystack transactions
 export async function POST(request: NextRequest) {
@@ -43,16 +42,15 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    const data = await response.json();
-
-    if (data.status && data.data.status === 'success') {
+    const data = await response.json();    if (data.status && data.data.status === 'success') {
       // Transaction was successful
       // Update user's subscription
       const planType = data.data.metadata?.custom_fields?.find((field: { variable_name: string; value: string }) => field.variable_name === 'plan')?.value || 'monthly';
-      const amount = data.data.amount / 100; // Convert from kobo back to base currency
+      const amount = data.data.amount / 100; // Convert from kobo back to base currency      // Get current subscriptions from file
+      const subscriptions = await getAllSubscriptions();
       
       // Find existing subscription or create a new one
-      const existingSubIndex = subscriptions.findIndex(sub => sub.userId === userId);
+      const existingSubIndex = subscriptions.findIndex((sub: { userId: string }) => sub.userId === userId);
       const now = new Date();
       const nextBillingDate = new Date();
       
@@ -62,7 +60,7 @@ export async function POST(request: NextRequest) {
         nextBillingDate.setFullYear(now.getFullYear() + 1);
       }
       
-      const newSubscription = {
+      const newSubscription: Subscription = {
         id: existingSubIndex >= 0 ? subscriptions[existingSubIndex].id : `sub_${Date.now()}`,
         userId,
         status: 'active' as const,
@@ -78,6 +76,8 @@ export async function POST(request: NextRequest) {
       } else {
         subscriptions.push(newSubscription);
       }
+        // Save updated subscriptions to file
+      await saveAllSubscriptions(subscriptions);
       
       return NextResponse.json({
         success: true,

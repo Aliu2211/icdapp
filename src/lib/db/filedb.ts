@@ -141,6 +141,11 @@ export async function upsertUserSubscription(subscription: Subscription): Promis
   return subscription;
 }
 
+// Save all subscriptions to file
+export async function saveAllSubscriptions(subscriptions: Subscription[]): Promise<void> {
+  fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(subscriptions, null, 2));
+}
+
 /**
  * Dashboard Stats
  */

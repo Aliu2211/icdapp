@@ -1,22 +1,10 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]/route';
+import { authOptions } from '../../auth/[...nextauth]/auth-options';
+// import { getUserSubscription, upsertUserSubscription, getAllSubscriptions, saveAllSubscriptions } from '@/src/lib/db/filedb';
+import { getUserSubscription, upsertUserSubscription } from '@/src/lib/db/filedb';
 import { Subscription } from '@/src/types/global';
-
-// In a real application, this would interact with a database and payment processor
-// For this demo, we'll simulate subscription data in memory
-export const subscriptions: Subscription[] = [
-  {
-    id: '1',
-    userId: '1',
-    status: 'active',
-    plan: 'pro',
-    amount: 10.00,
-    billingCycle: 'monthly',
-    nextBillingDate: new Date('2025-07-15').toISOString(),
-    createdAt: new Date('2025-06-15').toISOString(),
-  },
-];
 
 // Get user's subscription
 export async function GET() {
@@ -40,8 +28,8 @@ export async function GET() {
       );
     }
 
-    // Find subscription for user
-    const subscription = subscriptions.find(sub => sub.userId === userId);
+    // Get subscription for user
+    const subscription = await getUserSubscription(userId);
     
     if (!subscription) {
       return NextResponse.json(
@@ -94,7 +82,9 @@ export async function POST(request: NextRequest) {
         { error: 'Plan and billing cycle are required' },
         { status: 400 }
       );
-    }    // Calculate amount based on plan and billing cycle (in GHS)
+    }
+
+    // Calculate amount based on plan and billing cycle (in GHS)
     let amount = 0;
     if (plan === 'pro') {
       amount = billingCycle === 'monthly' ? 120.00 : 1200.00;
@@ -115,44 +105,25 @@ export async function POST(request: NextRequest) {
       nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
     }
 
-    // Find existing subscription or create new one
-    const existingSubIndex = subscriptions.findIndex(sub => sub.userId === userId);
+    // Create or update subscription
+    const subscription: Subscription = {
+      id: `sub_${Date.now()}`,
+      userId,
+      status: 'active',
+      plan: plan as 'free' | 'pro' | 'business',
+      amount,
+      billingCycle: billingCycle as 'monthly' | 'yearly',
+      nextBillingDate: nextBillingDate.toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+
+    const savedSubscription = await upsertUserSubscription(subscription);
     
-    if (existingSubIndex !== -1) {    // Update existing subscription
-      subscriptions[existingSubIndex] = {
-        ...subscriptions[existingSubIndex],
-        plan: plan as 'free' | 'pro' | 'business', // Type assertion to match the enum
-        billingCycle: billingCycle as 'monthly' | 'yearly', // Type assertion to match the enum
-        amount,
-        status: 'active',
-        nextBillingDate: nextBillingDate.toISOString(),
-      };
-      
-      return NextResponse.json({
-        subscription: subscriptions[existingSubIndex],
-        success: true,
-        message: 'Subscription updated successfully',
-      });
-    } else {      // Create new subscription
-      const newSubscription: Subscription = {
-        id: String(subscriptions.length + 1),
-        userId,
-        status: 'active', // 'active' is explicitly a valid value for the status enum
-        plan: plan as 'free' | 'pro' | 'business', // Type assertion to match the enum
-        amount,
-        billingCycle: billingCycle as 'monthly' | 'yearly', // Type assertion to match the enum
-        nextBillingDate: nextBillingDate.toISOString(),
-        createdAt: new Date().toISOString(),
-      };
-      
-      subscriptions.push(newSubscription);
-      
-      return NextResponse.json({
-        subscription: newSubscription,
-        success: true,
-        message: 'Subscription created successfully',
-      });
-    }
+    return NextResponse.json({
+      subscription: savedSubscription,
+      success: true,
+      message: 'Subscription updated successfully',
+    });
   } catch (error) {
     console.error('Subscription update error:', error);
     return NextResponse.json(
@@ -184,21 +155,23 @@ export async function DELETE() {
       );
     }
 
-    // Find subscription for user
-    const subIndex = subscriptions.findIndex(sub => sub.userId === userId);
+    // Get existing subscription
+    const subscription = await getUserSubscription(userId);
     
-    if (subIndex === -1) {
+    if (!subscription) {
       return NextResponse.json(
         { error: 'No subscription found' },
         { status: 404 }
       );
     }
 
-    // Update subscription status
-    subscriptions[subIndex] = {
-      ...subscriptions[subIndex],
-      status: 'canceled',
+    // Update subscription status to canceled
+    const canceledSubscription = {
+      ...subscription,
+      status: 'canceled' as const,
     };
+
+    await upsertUserSubscription(canceledSubscription);
 
     return NextResponse.json({
       success: true,
